@@ -1,0 +1,7 @@
+fastapi>=0.121,<1
+uvicorn[standard]>=0.38,<1
+httpx==0.28.1
+pydantic>=2.12,<3
+fugashi[unidic-lite]==1.4.0; python_version < "3.14"
+sudachipy==0.6.11
+sudachidict_core==20260428

@@ -1,0 +1,84 @@
+body {
+  width: 280px;
+  margin: 0;
+  background: #ffffff;
+  color: #111827;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+main {
+  padding: 12px;
+}
+
+h1 {
+  margin: 0 0 12px;
+  font-size: 16px;
+}
+
+button {
+  width: 100%;
+  min-height: 34px;
+  margin: 0 0 10px;
+  border: 1px solid #0f766e;
+  border-radius: 6px;
+  background: #0f766e;
+  color: #ffffff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+button.secondary {
+  border-color: #d1d5db;
+  background: #ffffff;
+  color: #111827;
+}
+
+label {
+  display: block;
+  margin: 0 0 8px;
+  color: #374151;
+  font-size: 13px;
+}
+
+textarea,
+select {
+  box-sizing: border-box;
+  width: 100%;
+  margin-top: 6px;
+  padding: 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  resize: vertical;
+  font: 14px/1.4 "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
+}
+
+#highlight-section {
+  margin: 0 0 10px;
+}
+
+.section-title {
+  margin: 0 0 6px;
+  color: #374151;
+  font-size: 13px;
+}
+
+#highlighted-text {
+  box-sizing: border-box;
+  max-height: 82px;
+  overflow: auto;
+  margin: 0 0 8px;
+  padding: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #f9fafb;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font: 14px/1.4 "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
+}
+
+#status {
+  min-height: 18px;
+  margin: 0;
+  color: #6b7280;
+  font-size: 12px;
+}

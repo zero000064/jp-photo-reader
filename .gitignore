@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.venv*/
+venv/
+.env
+.env.*
+
+# Local generated data
+backend/data/
+tmp/
+
+# Local notes and machine-specific state
+RESUME_NOTES.md
+*.log
+
+# OS/editor noise
+.DS_Store
+.idea/
+.vscode/
+
+# Model/cache artifacts
+.ollama/
+*.gguf

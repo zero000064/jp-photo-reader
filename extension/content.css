@@ -1,0 +1,186 @@
+.jpr-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483646;
+  cursor: crosshair;
+  background: rgba(16, 24, 32, 0.18);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.jpr-hint {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #111827;
+  color: #fff;
+  font-size: 13px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+}
+
+.jpr-selection {
+  position: fixed;
+  border: 2px solid #14b8a6;
+  background: rgba(20, 184, 166, 0.16);
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.18);
+}
+
+.jpr-panel {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 2147483647;
+  width: min(420px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow: hidden;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #111827;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.22);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 14px;
+}
+
+.jpr-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+.jpr-close {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #374151;
+  cursor: pointer;
+}
+
+.jpr-body {
+  max-height: calc(100vh - 86px);
+  overflow: auto;
+  padding: 12px;
+}
+
+.jpr-body section {
+  margin: 0 0 16px;
+}
+
+.jpr-body h2 {
+  margin: 0 0 8px;
+  color: #111827;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.jpr-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #f9fafb;
+  font: 15px/1.55 "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
+}
+
+.jpr-entry,
+.jpr-explanation {
+  margin: 0 0 8px;
+  padding: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.jpr-entry span {
+  color: #4b5563;
+}
+
+.jpr-entry small {
+  display: block;
+  margin-top: 4px;
+  color: #6b7280;
+}
+
+.jpr-token-id {
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.jpr-token-dictionary {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #f3f4f6;
+}
+
+.jpr-token-dictionary-entry {
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.jpr-token-dictionary-entry div {
+  color: #374151;
+}
+
+.jpr-explanation p {
+  margin: 6px 0 0;
+}
+
+.jpr-muted {
+  color: #6b7280;
+}
+
+.jpr-error {
+  padding: 10px;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.jpr-selection-result h3 {
+  margin: 10px 0 6px;
+  color: #111827;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.jpr-selected-text {
+  margin: 0 0 8px;
+  padding: 8px;
+  border: 1px solid #ccfbf1;
+  border-radius: 6px;
+  background: #f0fdfa;
+  word-break: break-word;
+}
+
+.jpr-actions {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+
+.jpr-button-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #111827;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
