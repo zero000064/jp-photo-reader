@@ -129,6 +129,30 @@
   line-height: 1.35;
 }
 
+.jpr-token-dictionary-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.jpr-pronounce {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #111827;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.jpr-pronounce:hover {
+  background: #f3f4f6;
+}
+
 .jpr-token-dictionary-entry div {
   color: #374151;
 }

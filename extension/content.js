@@ -122,6 +122,7 @@
     if (panel) return panel;
     panel = document.createElement("aside");
     panel.className = "jpr-panel";
+    panel.addEventListener("click", onPanelClick);
     document.documentElement.appendChild(panel);
     return panel;
   }
@@ -199,6 +200,22 @@
       </div>
     `;
     panel.querySelector(".jpr-close").addEventListener("click", closePanel);
+  }
+
+  function onPanelClick(event) {
+    const button = event.target.closest(".jpr-pronounce");
+    if (!button) return;
+    const text = button.dataset.pronounce || "";
+    if (text) pronounceJapanese(text);
+  }
+
+  function pronounceJapanese(text) {
+    if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "ja-JP";
+    utterance.rate = 0.85;
+    window.speechSynthesis.speak(utterance);
   }
 
   async function onRecognizedTextSelection() {
@@ -317,13 +334,14 @@
 
   function renderTokenDictionaryEntry(entry) {
     const glosses = (entry.glosses || []).slice(0, 3).map(escapeHtml).join("; ");
-    const reading = entry.reading ? ` <span>${escapeHtml(entry.reading)}</span>` : "";
-    return `
-      <div class="jpr-token-dictionary-entry">
-        <strong>${escapeHtml(entry.expression || entry.query || "")}</strong>${reading}
-        <div>${glosses}</div>
-      </div>
-    `;
+    const expression = entry.expression || entry.query || "";
+    const reading = entry.reading ? " <span>" + escapeHtml(entry.reading) + "</span>" : "";
+    const pronounceText = entry.reading || expression;
+    return "<div class='jpr-token-dictionary-entry'>" +
+      "<div class='jpr-token-dictionary-head'>" +
+      "<span><strong>" + escapeHtml(expression) + "</strong>" + reading + "</span>" +
+      "<button class='jpr-pronounce' type='button' title='Pronounce' aria-label='Pronounce " + escapeHtml(expression) + "' data-pronounce='" + escapeHtml(pronounceText) + "'>🔊</button>" +
+      "</div><div>" + glosses + "</div></div>";
   }
 
   function googleSearchUrl(text) {
