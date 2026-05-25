@@ -154,10 +154,21 @@ async function postJson(url, body) {
     body: JSON.stringify(body)
   });
   if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Backend error ${response.status}: ${text}`);
+    throw new Error(await formatBackendError(response));
   }
   return response.json();
+}
+
+async function formatBackendError(response) {
+  const fallback = response.statusText || "Request failed";
+  try {
+    const data = await response.json();
+    const detail = typeof data?.detail === "string" ? data.detail : JSON.stringify(data);
+    return "Backend error " + response.status + ": " + (detail || fallback);
+  } catch {
+    const text = await response.text();
+    return "Backend error " + response.status + ": " + (text || fallback);
+  }
 }
 
 async function cropDataUrl(dataUrl, rect, devicePixelRatio) {

@@ -176,6 +176,7 @@ def normalize_image_payload(image: str) -> str:
 
 
 async def ocr_with_manga_ocr(image_b64: str) -> str:
+    global _manga_ocr
     try:
         image_bytes = base64.b64decode(image_b64)
     except Exception as exc:
@@ -203,9 +204,19 @@ async def ocr_with_manga_ocr(image_b64: str) -> str:
 
     try:
         return await asyncio.to_thread(run_ocr)
-    except RuntimeError as exc:
+    except Exception as exc:
         if "Manga-OCR GPU required" in str(exc):
             raise HTTPException(status_code=503, detail=str(exc)) from exc
+        if is_cuda_ocr_error(exc):
+            _manga_ocr = None
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Manga-OCR failed while running on CUDA. Restart the backend to reset the CUDA context, "
+                    "then retry image analysis. If this repeats, close other GPU-heavy apps or start the backend "
+                    "with MANGA_OCR_REQUIRE_CUDA=0 to allow CPU OCR."
+                ),
+            ) from exc
         raise
 
 
@@ -225,6 +236,17 @@ def torch_cuda_available() -> bool:
     except ImportError:
         return False
     return bool(torch.cuda.is_available())
+
+
+def is_cuda_ocr_error(exc: BaseException) -> bool:
+    message = str(exc).lower()
+    error_type = type(exc).__name__.lower()
+    return "cuda" in message and (
+        "launch failure" in message
+        or "acceleratorerror" in error_type
+        or "out of memory" in message
+        or "illegal memory access" in message
+    )
 
 
 def ensure_manga_ocr_cuda_available() -> None:
