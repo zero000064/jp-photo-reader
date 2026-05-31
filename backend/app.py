@@ -16,6 +16,37 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 try:
+    from grammar_matcher import (
+        HANABIRA_ATTRIBUTION,
+        DEFAULT_GRAMMAR_DIR,
+        DEFAULT_MARKDOWN_DIR,
+        build_entry_index,
+        canonical_title,
+        dedupe_matches,
+        load_grammar_entries,
+        match_grammar_points,
+        normalize_classifier_label,
+        recover_classifier_candidates,
+        remove_contained_matches,
+        read_grammar_markdown,
+    )
+except ImportError:  # pragma: no cover - supports importing backend.app from repo root
+    from backend.grammar_matcher import (
+        HANABIRA_ATTRIBUTION,
+        DEFAULT_GRAMMAR_DIR,
+        DEFAULT_MARKDOWN_DIR,
+        build_entry_index,
+        canonical_title,
+        dedupe_matches,
+        load_grammar_entries,
+        match_grammar_points,
+        normalize_classifier_label,
+        recover_classifier_candidates,
+        remove_contained_matches,
+        read_grammar_markdown,
+    )
+
+try:
     from sudachipy import Dictionary as SudachiDictionary
     from sudachipy import SplitMode
 except Exception:  # pragma: no cover - optional runtime dependency
@@ -32,7 +63,7 @@ APP_DIR = Path(__file__).resolve().parent
 DB_PATH = APP_DIR / "data" / "jmdict.sqlite"
 JAPANESE_CHAR_PATTERN = r"[\u3040-\u30ff\u3400-\u9fff]"
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
-DEFAULT_OLLAMA_TEXT_MODEL = "hf.co/XpressAI/shisa-v2.1-unphi4-14b-GGUF:Q4_K_M"
+DEFAULT_OLLAMA_TEXT_MODEL = "hf.co/DevQuasar/shisa-ai.shisa-v2-qwen2.5-32b-GGUF:Q3_K_M"
 OLLAMA_TEXT_MODEL = os.getenv("OLLAMA_TEXT_MODEL", DEFAULT_OLLAMA_TEXT_MODEL)
 MANGA_OCR_REQUIRE_CUDA = os.getenv("MANGA_OCR_REQUIRE_CUDA", "1").lower() not in {"0", "false", "no"}
 _manga_ocr = None
@@ -54,12 +85,16 @@ tagger = Tagger() if Tagger else None
 class AnalyzeImageRequest(BaseModel):
     image: str
     explain_grammar: bool = True
+    explain_sentence_tree: bool = False
+    use_ollama_grammar_classifier: bool = False
     grammar_question: str | None = None
 
 
 class AnalyzeTextRequest(BaseModel):
     text: str
     explain_grammar: bool = True
+    explain_sentence_tree: bool = False
+    use_ollama_grammar_classifier: bool = False
     grammar_question: str | None = None
 
 
@@ -69,6 +104,19 @@ class GrammarQuestionRequest(BaseModel):
 
 
 class LookupTextRequest(BaseModel):
+    text: str
+
+
+class GrammarMarkdownRequest(BaseModel):
+    markdown_file: str
+
+
+class AnalyzeGrammarOnlyRequest(BaseModel):
+    text: str
+    use_ollama_grammar_classifier: bool = False
+
+
+class AnalyzeSentenceOnlyRequest(BaseModel):
     text: str
 
 
@@ -100,6 +148,8 @@ async def health() -> dict[str, Any]:
         "manga_ocr_require_cuda": MANGA_OCR_REQUIRE_CUDA,
         "torch_cuda_available": torch_cuda_available(),
         "dictionary": DB_PATH.exists(),
+        "hanabira_grammar": DEFAULT_GRAMMAR_DIR.exists(),
+        "hanabira_grammar_markdown": DEFAULT_MARKDOWN_DIR.exists(),
     }
 
 
@@ -107,7 +157,13 @@ async def health() -> dict[str, Any]:
 async def analyze_image(payload: AnalyzeImageRequest) -> dict[str, Any]:
     image_b64 = normalize_image_payload(payload.image)
     text = await ocr_with_manga_ocr(image_b64)
-    result = await analyze_text_internal(text, payload.explain_grammar, payload.grammar_question)
+    result = await analyze_text_internal(
+        text,
+        payload.explain_grammar,
+        payload.grammar_question,
+        payload.explain_sentence_tree,
+        payload.use_ollama_grammar_classifier,
+    )
     result["ocr_provider"] = "manga-ocr"
     result["manga_ocr_device"] = manga_ocr_device()
     return result
@@ -115,7 +171,13 @@ async def analyze_image(payload: AnalyzeImageRequest) -> dict[str, Any]:
 
 @app.post("/analyze-text")
 async def analyze_text(payload: AnalyzeTextRequest) -> dict[str, Any]:
-    return await analyze_text_internal(payload.text, payload.explain_grammar, payload.grammar_question)
+    return await analyze_text_internal(
+        payload.text,
+        payload.explain_grammar,
+        payload.grammar_question,
+        payload.explain_sentence_tree,
+        payload.use_ollama_grammar_classifier,
+    )
 
 
 @app.post("/answer-grammar-question")
@@ -134,6 +196,45 @@ async def answer_grammar_question(payload: GrammarQuestionRequest) -> dict[str, 
     }
 
 
+@app.post("/grammar-markdown")
+async def grammar_markdown(payload: GrammarMarkdownRequest) -> dict[str, Any]:
+    result = read_grammar_markdown(payload.markdown_file)
+    if not result:
+        raise HTTPException(status_code=404, detail="grammar markdown not found")
+    return result
+
+
+@app.post("/analyze-grammar-only")
+async def analyze_grammar_only(payload: AnalyzeGrammarOnlyRequest) -> dict[str, Any]:
+    cleaned = normalize_ocr_text(payload.text)
+    if not cleaned:
+        raise HTTPException(status_code=400, detail="text is required")
+    tokens = tokenize(cleaned)
+    structure = parse_sentence_structure(tokens)
+    grammar_matches = match_grammar_points(cleaned, tokens, tokenize)
+    if payload.use_ollama_grammar_classifier:
+        grammar_matches = await enrich_grammar_matches_with_ollama(cleaned, tokens, grammar_matches)
+    grammar_analysis = await analyze_grammar_with_ollama(cleaned, structure, grammar_matches)
+    return {
+        "text": cleaned,
+        "grammar_analysis": grammar_analysis,
+    }
+
+
+@app.post("/analyze-sentence-only")
+async def analyze_sentence_only(payload: AnalyzeSentenceOnlyRequest) -> dict[str, Any]:
+    cleaned = normalize_ocr_text(payload.text)
+    if not cleaned:
+        raise HTTPException(status_code=400, detail="text is required")
+    tokens = tokenize(cleaned)
+    structure = parse_sentence_structure(tokens)
+    sentence_analysis = await analyze_sentence_tree_with_ollama(cleaned, structure)
+    return {
+        "text": cleaned,
+        "sentence_analysis": sentence_analysis,
+    }
+
+
 @app.post("/lookup-text")
 async def lookup_text(payload: LookupTextRequest) -> dict[str, Any]:
     cleaned = normalize_lookup_text(payload.text)
@@ -146,19 +247,45 @@ async def lookup_text(payload: LookupTextRequest) -> dict[str, Any]:
     }
 
 
-async def analyze_text_internal(text: str, explain_grammar: bool, grammar_question: str | None = None) -> dict[str, Any]:
+async def analyze_text_internal(
+    text: str,
+    explain_grammar: bool,
+    grammar_question: str | None = None,
+    explain_sentence_tree: bool = False,
+    use_ollama_grammar_classifier: bool = False,
+) -> dict[str, Any]:
     cleaned = normalize_ocr_text(text)
     tokens = tokenize(cleaned)
     structure = parse_sentence_structure(tokens)
     dictionary = dedupe_entries([entry for item in structure for entry in item.get("dictionary", [])])
     grammar_question = (grammar_question or "").strip()
-    grammar_analysis = await analyze_grammar_with_ollama(cleaned, structure) if explain_grammar else ""
-    grammar_answer = await answer_grammar_question_with_ollama(cleaned, grammar_question) if explain_grammar and grammar_question else ""
+    grammar_matches = match_grammar_points(cleaned, tokens, tokenize)
+    if use_ollama_grammar_classifier:
+        grammar_matches = await enrich_grammar_matches_with_ollama(cleaned, tokens, grammar_matches)
+    sentence_analysis = fallback_sentence_analysis(cleaned, structure)
+    grammar_analysis = ""
+    grammar_answer = ""
+
+    if explain_grammar and explain_sentence_tree:
+        grammar_analysis, sentence_analysis = await asyncio.gather(
+            analyze_grammar_with_ollama(cleaned, structure, grammar_matches),
+            analyze_sentence_tree_with_ollama(cleaned, structure),
+        )
+    elif explain_sentence_tree:
+        sentence_analysis = await analyze_sentence_tree_with_ollama(cleaned, structure)
+    elif explain_grammar:
+        grammar_analysis = await analyze_grammar_with_ollama(cleaned, structure, grammar_matches)
+
+    if explain_grammar and grammar_question:
+        grammar_answer = await answer_grammar_question_with_ollama(cleaned, grammar_question)
     return {
         "text": cleaned,
         "tokens": tokens,
         "sentence_structure": structure,
         "dictionary": dictionary,
+        "sentence_analysis": sentence_analysis,
+        "grammar_matches": grammar_matches,
+        "grammar_reference_attribution": HANABIRA_ATTRIBUTION if grammar_matches else "",
         "grammar_analysis": grammar_analysis,
         "grammar_answer": grammar_answer,
         "grammar_question": grammar_question,
@@ -263,12 +390,217 @@ def ensure_manga_ocr_cuda_available() -> None:
         )
 
 
-async def analyze_grammar_with_ollama(
-    text: str, structure: list[dict[str, str]]
-) -> str:
+async def enrich_grammar_matches_with_ollama(
+    text: str,
+    tokens: list[dict[str, Any]],
+    existing_matches: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    if not text or not tokens:
+        return existing_matches
+
+    candidates = await classify_grammar_points_with_ollama(text)
+    if not candidates:
+        return existing_matches
+
+    entries = load_grammar_entries(str(DEFAULT_GRAMMAR_DIR))
+    entry_index = build_entry_index(entries)
+    labels = normalize_ollama_candidate_labels(candidates)
+    recovered_labels = {str(match.get("rule_label") or "") for match in existing_matches}
+    recovered = recover_classifier_candidates(tokens, labels, entry_index, recovered_labels)
+    raw_candidate_matches = [
+        ollama_candidate_to_match(candidate, text, entries)
+        for candidate in candidates
+        if not has_known_classifier_label(str(candidate.get("label") or ""))
+    ]
+    combined = [*existing_matches, *recovered, *raw_candidate_matches]
+    combined = [match for match in combined if match.get("title")]
+    combined.sort(key=lambda item: (float(item.get("confidence") or 0), len(str(item.get("matched_text") or ""))), reverse=True)
+    return remove_contained_matches(dedupe_matches(combined))[:12]
+
+
+async def classify_grammar_points_with_ollama(text: str) -> list[dict[str, Any]]:
+    catalog = format_candidate_grammar_catalog(text)
     prompt = f"""
 /no_think
-You are a Japanese grammar analyst. Return only the final answer, no reasoning.
+You are a Japanese grammar point detector. Return only valid JSON, no markdown.
+
+Detect learner-facing Japanese grammar points in the sentence. Do not explain the full sentence.
+Prefer labels from this local Hanabira grammar catalog when the marker appears with the same meaning in the sentence:
+{catalog}
+
+Return this exact JSON shape:
+{{
+  "candidates": [
+    {{"label": "grammar label", "span_hint": "Japanese span in the sentence", "confidence": 0.0}}
+  ]
+}}
+
+Rules:
+- Return at most 8 candidates.
+- Include useful particles only when they have a clear learner-facing role, such as で meaning using/by means of.
+- Include nested grammar when useful, e.g. Vてみる inside Vてもいい.
+- Use plain labels like Vてみる, Vてもいい, かも, で.
+
+Sentence:
+{text}
+""".strip()
+    body = {
+        "model": OLLAMA_TEXT_MODEL,
+        "prompt": prompt,
+        "stream": False,
+        "think": False,
+        "format": "json",
+        "options": {"temperature": 0.0, "num_predict": 700, "repeat_penalty": 1.05},
+    }
+    timeout = float(os.getenv("JPR_OLLAMA_GRAMMAR_CLASSIFIER_TIMEOUT", "35"))
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            response = await client.post(f"{OLLAMA_URL}/api/generate", json=body)
+            response.raise_for_status()
+    except (httpx.HTTPError, ValueError):
+        return []
+
+    content = ollama_text_response(response.json())
+    try:
+        parsed = json.loads(content)
+    except json.JSONDecodeError:
+        return []
+    candidates = parsed.get("candidates", []) if isinstance(parsed, dict) else []
+    return [compact_ollama_candidate(item) for item in candidates if isinstance(item, dict)]
+
+
+def format_candidate_grammar_catalog(text: str, limit: int = 40) -> str:
+    normalized_text = re.sub(r"[\s\u3000、。,.!?！？\-ー]+", "", text)
+    candidates = []
+    for entry in load_grammar_entries(str(DEFAULT_GRAMMAR_DIR)):
+        markers = [str(marker) for marker in entry.get("markers", []) if marker]
+        matched_markers = [marker for marker in markers if marker in normalized_text]
+        if not matched_markers:
+            continue
+        title = str(entry.get("title") or "").strip()
+        formation = str(entry.get("formation") or "").strip()
+        if not title:
+            continue
+        marker_text = "/".join(matched_markers[:3])
+        row = f"- {title} [marker: {marker_text}]: {formation}" if formation else f"- {title} [marker: {marker_text}]"
+        candidates.append((max(len(marker) for marker in matched_markers), row))
+    candidates.sort(key=lambda item: item[0], reverse=True)
+    rows = [row for _, row in candidates[:limit]]
+    return "\n".join(rows) if rows else "- No local catalog candidates found."
+
+
+def normalize_ollama_candidate_labels(candidates: list[dict[str, Any]]) -> list[str]:
+    labels: list[str] = []
+    for candidate in candidates:
+        label = str(candidate.get("label") or "")
+        for normalized in normalize_classifier_label(label):
+            if normalized.startswith("classifier:"):
+                continue
+            labels.append(normalized)
+    seen = set()
+    result = []
+    for label in labels:
+        if label and label not in seen:
+            seen.add(label)
+            result.append(label)
+    return result
+
+
+def has_known_classifier_label(label: str) -> bool:
+    return any(not item.startswith("classifier:") for item in normalize_classifier_label(label))
+
+
+def compact_ollama_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
+    confidence = candidate.get("confidence", 0.55)
+    try:
+        confidence = float(confidence)
+    except (TypeError, ValueError):
+        confidence = 0.55
+    return {
+        "label": str(candidate.get("label") or "").strip(),
+        "span_hint": str(candidate.get("span_hint") or "").strip(),
+        "confidence": max(0.0, min(confidence, 0.9)),
+    }
+
+
+def ollama_candidate_to_match(candidate: dict[str, Any], text: str, entries: tuple[dict[str, Any], ...]) -> dict[str, Any]:
+    label = str(candidate.get("label") or "").strip()
+    span_hint = str(candidate.get("span_hint") or "").strip()
+    entry = find_entry_for_candidate_label(label, entries) or {}
+    matched_text = span_hint if span_hint and span_hint in text else ""
+    confidence = float(candidate.get("confidence") or 0.55)
+    return {
+        "title": entry.get("title") or label,
+        "markdown_file": entry.get("markdown_file", ""),
+        "jlpt_level": entry.get("jlpt_level", ""),
+        "confidence": round(min(confidence, 0.86), 2),
+        "matched_text": matched_text,
+        "matched_markers": [{"marker": label, "start_token": 0, "end_token": 0}] if label else [],
+        "formation": entry.get("formation", ""),
+        "short_explanation": entry.get("short_explanation", "AI-detected grammar candidate."),
+        "long_explanation": entry.get("long_explanation", ""),
+        "examples": entry.get("examples", [])[:2],
+        "source": "Ollama grammar classifier",
+    }
+
+
+def find_entry_for_candidate_label(label: str, entries: tuple[dict[str, Any], ...]) -> dict[str, Any] | None:
+    key = canonical_title(label)
+    if not key:
+        return None
+    fallback = None
+    for entry in entries:
+        entry_key = canonical_title(str(entry.get("title") or ""))
+        formation_key = canonical_title(str(entry.get("formation") or ""))
+        if key == entry_key or key == formation_key:
+            return entry
+        if len(key) >= 3 and (key in entry_key or entry_key in key or key in formation_key):
+            fallback = fallback or entry
+    return fallback
+
+
+async def analyze_grammar_with_ollama(
+    text: str, structure: list[dict[str, str]], grammar_matches: list[dict[str, Any]] | None = None
+) -> str:
+    prompt = f"""
+/think
+You are a Japanese grammar analyst.
+
+Sentence:
+{text}
+
+Explain how the sentence works grammatically.
+Focus on useful learner-facing analysis: clause structure, particles, verb forms, auxiliaries, conjugations, and natural meaning.
+Return a concise plain-text explanation.
+""".strip()
+    body = {
+        "model": OLLAMA_TEXT_MODEL,
+        "prompt": prompt,
+        "stream": False,
+
+        "options": {"temperature": 0.2, "num_predict": -1, "repeat_penalty": 1.1},
+    }
+    async with httpx.AsyncClient(timeout=None) as client:
+        try:
+            response = await client.post(f"{OLLAMA_URL}/api/generate", json=body)
+            response.raise_for_status()
+            return clean_ollama_final_answer(ollama_text_response(response.json()))
+        except Exception as exc:
+            print(f"Error calling Ollama: {exc}")
+            return "⚠️ Ollama connection failed. Please ensure the local Ollama server is running."
+
+
+def clean_ollama_final_answer(text: str) -> str:
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.IGNORECASE | re.DOTALL).strip()
+    return re.sub(r"^\s*(?:\*\*)?final answer:?(?:\*\*)?\s*", "", text, flags=re.IGNORECASE).strip()
+
+
+async def analyze_sentence_tree_with_ollama(
+    text: str, structure: list[dict[str, str]]
+) -> dict[str, Any]:
+    prompt = f"""
+/think
+You are a Japanese sentence analyzer. Output the result in a markdown JSON code block.
 
 Sentence:
 {text}
@@ -276,33 +608,53 @@ Sentence:
 SudachiPy token structure:
 {format_structure_for_prompt(structure)}
 
-Use the SudachiPy structure to explain how the sentence works grammatically.
-Focus on useful learner-facing analysis: clause structure, particles, verb forms, auxiliaries, conjugations, and natural meaning.
-Do not return a list of matched grammar labels. Do not include character offsets.
-Return a concise plain-text explanation.
+Create a learner-facing sentence analysis tree inspired by parse-tree language learning tools.
+Use this exact JSON shape:
+{{
+  "summary": "one concise English summary of the sentence structure",
+  "tree": {{
+    "type": "sentence",
+    "value": "the full Japanese sentence",
+    "translation": "natural English meaning",
+    "role": "sentence",
+    "children": [
+      {{
+        "type": "phrase type such as topic, noun_phrase, verb_phrase, modifier, particle, auxiliary",
+        "value": "Japanese span",
+        "translation": "English gloss or role",
+        "role": "short learner-facing role",
+        "children": []
+      }}
+    ]
+  }}
+}}
+
+Group adjacent tokens into meaningful phrases when possible. Include particles and auxiliaries as child nodes under the phrase they mark. Keep labels concise.
 """.strip()
     body = {
         "model": OLLAMA_TEXT_MODEL,
         "prompt": prompt,
         "stream": False,
-        "think": False,
-        "options": {"temperature": 0.2, "num_predict": 1024, "repeat_penalty": 1.1},
+        "options": {"temperature": 0.1, "num_predict": -1, "repeat_penalty": 1.1},
     }
-    async with httpx.AsyncClient(timeout=120) as client:
+    async with httpx.AsyncClient(timeout=None) as client:
         try:
             response = await client.post(f"{OLLAMA_URL}/api/generate", json=body)
             response.raise_for_status()
-        except httpx.HTTPError as exc:
-            raise HTTPException(status_code=502, detail=f"Ollama grammar analysis request failed: {exc}") from exc
-    return ollama_text_response(response.json())
+            content = ollama_text_response(response.json())
+            parsed = parse_sentence_analysis_json(content)
+            return parsed if parsed else fallback_sentence_analysis(text, structure)
+        except Exception as exc:
+            print(f"Error calling Ollama: {exc}")
+            return fallback_sentence_analysis(text, structure)
 
 
 async def answer_grammar_question_with_ollama(
     text: str, grammar_question: str
 ) -> str:
     prompt = f"""
-/no_think
-You are a Japanese grammar tutor. Return only the final answer, no reasoning.
+/think
+You are a Japanese grammar tutor.
 
 Sentence:
 {text}
@@ -316,16 +668,17 @@ Answer the user question directly in 1 short paragraph. Start with the answer im
         "model": OLLAMA_TEXT_MODEL,
         "prompt": prompt,
         "stream": False,
-        "think": False,
-        "options": {"temperature": 0.2, "num_predict": 1024, "repeat_penalty": 1.1},
+
+        "options": {"temperature": 0.2, "num_predict": -1, "repeat_penalty": 1.1},
     }
-    async with httpx.AsyncClient(timeout=120) as client:
+    async with httpx.AsyncClient(timeout=None) as client:
         try:
             response = await client.post(f"{OLLAMA_URL}/api/generate", json=body)
             response.raise_for_status()
-        except httpx.HTTPError as exc:
-            raise HTTPException(status_code=502, detail=f"Ollama grammar question request failed: {exc}") from exc
-    return ollama_text_response(response.json())
+            return clean_ollama_final_answer(ollama_text_response(response.json()))
+        except Exception as exc:
+            print(f"Error calling Ollama: {exc}")
+            return "⚠️ Ollama connection failed. Please ensure the local Ollama server is running."
 
 
 def ollama_text_response(payload: dict[str, Any]) -> str:
@@ -333,6 +686,69 @@ def ollama_text_response(payload: dict[str, Any]) -> str:
     if response:
         return response
     return str(payload.get("thinking") or "").strip()
+
+
+def parse_sentence_analysis_json(content: str) -> dict[str, Any] | None:
+    if not content:
+        return None
+    try:
+        payload = json.loads(content)
+    except json.JSONDecodeError:
+        match = re.search(r"\{.*\}", content, re.DOTALL)
+        if not match:
+            return None
+        try:
+            payload = json.loads(match.group(0))
+        except json.JSONDecodeError:
+            return None
+    if not isinstance(payload, dict):
+        return None
+    tree = payload.get("tree")
+    if not isinstance(tree, dict):
+        return None
+    return {
+        "summary": str(payload.get("summary") or "").strip(),
+        "tree": normalize_tree_node(tree),
+        "source": "ollama",
+    }
+
+
+def normalize_tree_node(node: dict[str, Any]) -> dict[str, Any]:
+    children = node.get("children")
+    return {
+        "type": str(node.get("type") or "phrase"),
+        "value": str(node.get("value") or ""),
+        "translation": str(node.get("translation") or ""),
+        "role": str(node.get("role") or ""),
+        "children": [
+            normalize_tree_node(child)
+            for child in children
+            if isinstance(child, dict)
+        ] if isinstance(children, list) else [],
+    }
+
+
+def fallback_sentence_analysis(text: str, structure: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
+        "summary": "Token-based sentence structure. Full phrase grouping requires grammar analysis.",
+        "source": "tokenizer",
+        "tree": {
+            "type": "sentence",
+            "value": text,
+            "translation": "",
+            "role": "sentence",
+            "children": [
+                {
+                    "type": item.get("role") or "token",
+                    "value": item.get("surface") or "",
+                    "translation": item.get("lemma") or "",
+                    "role": item.get("pos") or item.get("role") or "",
+                    "children": [],
+                }
+                for item in structure
+            ],
+        },
+    }
 
 
 def format_structure_for_prompt(structure: list[dict[str, str]]) -> str:
@@ -348,6 +764,24 @@ def format_structure_for_prompt(structure: list[dict[str, str]]) -> str:
         )
         for item in structure
     )
+
+
+def format_grammar_matches_for_prompt(matches: list[dict[str, Any]]) -> str:
+    if not matches:
+        return "(none)"
+    lines = []
+    for match in matches[:6]:
+        lines.append(
+            "- {title} | level={level} | confidence={confidence} | matched={matched} | formation={formation} | explanation={explanation}".format(
+                title=match.get("title", ""),
+                level=match.get("jlpt_level", ""),
+                confidence=match.get("confidence", ""),
+                matched=match.get("matched_text", ""),
+                formation=match.get("formation", ""),
+                explanation=match.get("short_explanation", ""),
+            )
+        )
+    return "\n".join(lines)
 
 
 def normalize_ocr_text(text: str) -> str:

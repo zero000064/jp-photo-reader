@@ -111,11 +111,6 @@
   color: #6b7280;
 }
 
-.jpr-token-id {
-  color: #6b7280;
-  font-size: 12px;
-  font-weight: 700;
-}
 
 .jpr-token-dictionary {
   margin-top: 8px;
@@ -151,6 +146,10 @@
 
 .jpr-pronounce:hover {
   background: #f3f4f6;
+}
+
+.jpr-analysis-audio {
+  margin-left: auto;
 }
 
 .jpr-token-dictionary-entry div {
@@ -207,4 +206,195 @@
   font-size: 13px;
   font-weight: 700;
   text-decoration: none;
+}
+
+.jpr-sentence-analysis {
+  display: grid;
+  gap: 8px;
+}
+
+.jpr-analysis-summary {
+  padding: 8px 10px;
+  border: 1px solid #ccfbf1;
+  border-radius: 6px;
+  background: #f0fdfa;
+  color: #115e59;
+  line-height: 1.45;
+}
+
+.jpr-analysis-node {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  border: 1px solid #e5e7eb;
+  border-left: 3px solid #14b8a6;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.jpr-analysis-depth-1 { border-left-color: #3b82f6; }
+.jpr-analysis-depth-2 { border-left-color: #a855f7; }
+.jpr-analysis-depth-3 { border-left-color: #f59e0b; }
+.jpr-analysis-depth-4 { border-left-color: #64748b; }
+
+.jpr-analysis-node-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.jpr-analysis-label,
+.jpr-analysis-role {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: #eef2ff;
+  color: #3730a3;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.jpr-analysis-role {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+.jpr-analysis-value {
+  color: #111827;
+  font: 15px/1.45 "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
+  word-break: break-word;
+}
+
+.jpr-analysis-translation {
+  margin-top: 3px;
+  color: #4b5563;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.jpr-analysis-children {
+  margin-top: 6px;
+  padding-left: 10px;
+  border-left: 1px dashed #d1d5db;
+}
+
+.jpr-grammar-matches {
+  display: grid;
+  gap: 8px;
+}
+
+.jpr-grammar-match {
+  line-height: 1.4;
+}
+
+.jpr-match-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.jpr-match-head span {
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.jpr-match-text,
+.jpr-match-formation {
+  margin: 5px 0;
+  color: #374151;
+  font-size: 13px;
+}
+
+.jpr-match-formation {
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: #f9fafb;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.jpr-match-examples {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid #f3f4f6;
+}
+
+.jpr-match-example {
+  margin-top: 5px;
+  color: #111827;
+  font-size: 13px;
+}
+
+.jpr-match-example small,
+.jpr-attribution {
+  display: block;
+  margin-top: 2px;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.jpr-open-grammar {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  margin-top: 8px;
+  padding: 0 9px;
+  border: 1px solid #14b8a6;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #0f766e;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.jpr-open-grammar:hover {
+  background: #f0fdfa;
+}
+
+.jpr-markdown-detail h3,
+.jpr-markdown-body h3,
+.jpr-markdown-body h4,
+.jpr-markdown-body h5,
+.jpr-markdown-body h6 {
+  margin: 10px 0 6px;
+  color: #111827;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.jpr-markdown-detail h3 {
+  margin-top: 0;
+  font-size: 15px;
+}
+
+.jpr-markdown-body {
+  max-height: 420px;
+  overflow: auto;
+  padding-right: 4px;
+  color: #1f2937;
+  line-height: 1.5;
+}
+
+.jpr-markdown-body p,
+.jpr-markdown-body ul {
+  margin: 6px 0;
+}
+
+.jpr-markdown-body ul {
+  padding-left: 18px;
+}
+
+.jpr-markdown-body code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: #f3f4f6;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
 }

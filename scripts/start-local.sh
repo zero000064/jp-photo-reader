@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BACKEND_DIR="$ROOT_DIR/backend"
 
 OLLAMA_URL="${OLLAMA_URL:-http://127.0.0.1:11434}"
-OLLAMA_TEXT_MODEL="${OLLAMA_TEXT_MODEL:-hf.co/XpressAI/shisa-v2.1-unphi4-14b-GGUF:Q4_K_M}"
+OLLAMA_TEXT_MODEL="${OLLAMA_TEXT_MODEL:-hf.co/DevQuasar/shisa-ai.shisa-v2-qwen2.5-32b-GGUF:Q3_K_M}"
 MANGA_OCR_REQUIRE_CUDA="${MANGA_OCR_REQUIRE_CUDA:-1}"
 OLLAMA_BIN="${OLLAMA_BIN:-ollama}"
 OLLAMA_LOG="${OLLAMA_LOG:-/tmp/jp-photo-reader-ollama.log}"

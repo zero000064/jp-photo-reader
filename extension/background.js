@@ -51,6 +51,9 @@ async function handleMessage(message, sender) {
   if (message?.type === "ANALYZE_TEXT") {
     const result = await postJson(API_BASE + "/analyze-text", {
       text: message.text,
+      explain_grammar: false,
+      explain_sentence_tree: false,
+      use_ollama_grammar_classifier: true,
       grammar_question: ""
     });
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -102,8 +105,34 @@ async function handleMessage(message, sender) {
     return { ok: true };
   }
 
+  if (message?.type === "GET_GRAMMAR_MARKDOWN") {
+    const result = await postJson(`${API_BASE}/grammar-markdown`, { markdown_file: message.markdownFile });
+    return { ok: true, result };
+  }
+
   if (message?.type === "LOOKUP_TEXT") {
     const result = await postJson(`${API_BASE}/lookup-text`, { text: message.text });
+    return { ok: true, result };
+  }
+
+  if (message?.type === "FETCH_GRAMMAR_ANALYSIS") {
+    const result = await postJson(`${API_BASE}/analyze-grammar-only`, { 
+      text: message.text,
+      use_ollama_grammar_classifier: true 
+    });
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab?.id) {
+      await chrome.tabs.sendMessage(tab.id, { type: "JPR_UPDATE_GRAMMAR_ANALYSIS", result });
+    }
+    return { ok: true, result };
+  }
+
+  if (message?.type === "FETCH_SENTENCE_ANALYSIS") {
+    const result = await postJson(`${API_BASE}/analyze-sentence-only`, { text: message.text });
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab?.id) {
+      await chrome.tabs.sendMessage(tab.id, { type: "JPR_UPDATE_SENTENCE_ANALYSIS", result });
+    }
     return { ok: true, result };
   }
 
@@ -127,7 +156,9 @@ async function analyzeImageUrl(tabId, srcUrl) {
 async function analyzeDataUrl(dataUrl) {
   return postJson(API_BASE + "/analyze-image", {
     image: dataUrl,
-    explain_grammar: true,
+    explain_grammar: false,
+    explain_sentence_tree: false,
+    use_ollama_grammar_classifier: true,
     grammar_question: ""
   });
 }
