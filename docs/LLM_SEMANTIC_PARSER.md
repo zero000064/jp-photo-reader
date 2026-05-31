@@ -15,7 +15,7 @@ Instead, I will write a Python script (`scripts/generate_smart_markers.py`) that
 - Injects those newly generated smart fields directly back into the Hanabira JSON files as `llm_markers` and `llm_formation_patterns`.
 
 ### 2. Backend Engine Updates
-#### [MODIFY] [grammar_matcher.py](file:///home/zero064/jp-photo-reader/backend/grammar_matcher.py)
+#### [MODIFY] [grammar_matcher.py](../backend/grammar_matcher.py)
 I will update the `load_grammar_entries` function to prioritize reading `llm_markers` and `llm_formation_patterns` directly from the JSON files. It will completely skip the regex stripping logic for any entry that has been processed by the LLM.
 
 ## User Review Required
